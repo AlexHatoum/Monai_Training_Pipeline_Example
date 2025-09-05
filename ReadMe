@@ -1,4 +1,5 @@
 # MONAI Brain Classification Pipeline
+#WARNING: This is still a work in progress and I am not done. I'm currently updating it and this Github is under contruction. 
 
 A comprehensive pipeline for brain MRI classification using ResNet in MONAI. Has explainable AI techniques added post-hoc (GRADCam). This repository provides tools for preprocessing brain imaging data, training ResNet models, and generating interpretable explanations for predictions. 
 While not in the read me, the script XXX can be used to generate some simulated data that can help you test the pipeline. Those images are low resolution, so should make testable in the span of a few hours (without a GPU). 
@@ -437,8 +438,8 @@ This project is licensed under the MIT License - see [LICENSE](LICENSE) file for
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/yourusername/monai-brain-pipeline/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/monai-brain-pipeline/discussions)
+- **Issues**: [GitHub Issues](https://github.com/AlexHatoum/monai-brain-pipeline/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/AlexHatoum/monai-brain-pipeline/discussions)
 - **Email**: ashatoum@wustl.edu
 
 ---
