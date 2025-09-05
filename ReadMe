@@ -42,6 +42,9 @@ cd monai-brain-pipeline
 conda create -n monai-brain python=3.9
 conda activate monai-brain
 
+#If CONDA is not available, you can try using my environment. Make sure Python is loaded and discoverable from your path
+source monai-env/bin/activate
+
 # Install dependencies
 pip install monai[all]==1.3.0
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
