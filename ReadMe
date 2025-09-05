@@ -1,0 +1,446 @@
+# MONAI Brain Classification Pipeline
+
+A comprehensive pipeline for brain MRI classification using ResNet in MONAI. Has explainable AI techniques added post-hoc (GRADCam). This repository provides tools for preprocessing brain imaging data, training ResNet models, and generating interpretable explanations for predictions. 
+While not in the read me, the script XXX can be used to generate some simulated data that can help you test the pipeline. Those images are low resolution, so should make testable in the span of a few hours (without a GPU). 
+
+## Overview
+
+This pipeline enables:
+- **Data Preprocessing**: Convert DICOM/NIfTI files to standardized 3D volumes
+- **Model Training**: Train 3D ResNet models using MONAI for brain phenotype classification
+- **Explainable AI**: Generate interpretable explanations using GradCAM, Integrated Gradients, and Saliency Maps
+- **Regional Analysis**: Analyze which brain regions contribute most to predictions
+
+##  Table of Contents
+
+- [Installation](#installation)
+- [Data Structure](#data-structure)
+- [Pipeline Overview](#pipeline-overview)
+- [Quick Start](#quick-start)
+- [Detailed Usage](#detailed-usage)
+- [Explainability Features](#explainability-features)
+- [Results Interpretation](#results-interpretation)
+- [Troubleshooting](#troubleshooting)
+- [Citation](#citation)
+
+## 🚀 Installation
+
+### Prerequisites
+- Python 3.8+
+- CUDA-compatible GPU (recommended)
+- 16GB+ RAM 
+
+### Setup Environment
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/monai-brain-pipeline
+cd monai-brain-pipeline
+
+# Create conda environment
+conda create -n monai-brain python=3.9
+conda activate monai-brain
+
+# Install dependencies
+pip install monai[all]==1.3.0
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+pip install scikit-learn pandas matplotlib seaborn tqdm
+pip install scipy nibabel pydicom
+
+# Verify installation
+python -c "import monai; print(f'MONAI version: {monai.__version__}')"
+```
+
+## 📁 Data Structure
+
+Organize your data in the following structure:
+
+```
+your_data_directory/
+├── controls/
+│   ├── subject001/
+│   │   ├── brain_scan.nii.gz
+│   │   └── metadata.json (optional)
+│   ├── subject002/
+│   └── ...
+├── cases/
+│   ├── subject101/
+│   │   ├── brain_scan.nii.gz
+│   │   └── metadata.json (optional)
+│   ├── subject102/
+│   └── ...
+└── data_manifest.csv (optional)
+```
+
+### Supported Formats
+- **NIfTI**: `.nii`, `.nii.gz`
+- **DICOM**: Series of `.dcm` files
+- **Analyze**: `.hdr`/`.img` pairs
+
+## 🔄 Pipeline Overview
+
+```mermaid
+graph LR
+    A[Raw Brain Data] --> B[Data Preprocessing]
+    B --> C[Train/Val/Test Split]
+    C --> D[Model Training]
+    D --> E[Model Evaluation]
+    E --> F[Explainability Analysis]
+    F --> G[Results & Visualizations]
+```
+
+## ⚡ Quick Start
+
+### 1. Preprocess Data
+
+```bash
+python preprocess_brain_data.py \
+    --input_dir /path/to/raw/data \
+    --output_dir ./processed_data \
+    --target_size 128 128 128 \
+    --spacing 1.0 1.0 1.0 \
+    --modality T1
+```
+
+### 2. Train Model
+
+```bash
+python train_resnet_brain_explainable.py \
+    --data_dir ./processed_data \
+    --output_dir ./results \
+    --batch_size 4 \
+    --num_epochs 50 \
+    --generate_explanations \
+    --feature_analysis
+```
+
+### 3. View Results
+
+```bash
+# Check training plots
+ls ./results/*_training_history.png
+
+# View explanations
+ls ./results/explanations/
+
+# Analyze feature importance
+ls ./results/feature_analysis/
+```
+
+## 📖 Detailed Usage
+
+### Data Preprocessing
+
+The preprocessing script standardizes brain images for training:
+
+```bash
+python preprocess_brain_data.py [OPTIONS]
+
+Options:
+  --input_dir TEXT          Input directory with raw brain data
+  --output_dir TEXT         Output directory for processed data
+  --target_size INT INT INT Target volume size [default: 128 128 128]
+  --spacing FLOAT FLOAT FLOAT  Target voxel spacing [default: 1.0 1.0 1.0]
+  --modality TEXT           MRI modality (T1, T2, FLAIR) [default: T1]
+  --normalize_intensity     Apply intensity normalization
+  --skull_strip             Perform skull stripping
+  --bias_correction         Apply N4 bias field correction
+  --train_split FLOAT       Training data proportion [default: 0.7]
+  --val_split FLOAT         Validation data proportion [default: 0.15]
+  --test_split FLOAT        Test data proportion [default: 0.15]
+```
+
+#### Example: Advanced Preprocessing
+
+```bash
+python preprocess_brain_data.py \
+    --input_dir /data/brain_scans \
+    --output_dir ./processed_data \
+    --target_size 160 192 160 \
+    --spacing 1.0 1.0 1.0 \
+    --modality T1 \
+    --normalize_intensity \
+    --skull_strip \
+    --bias_correction \
+    --train_split 0.8 \
+    --val_split 0.1 \
+    --test_split 0.1
+```
+
+### Model Training & Explainability
+
+Train explainable ResNet models:
+
+```bash
+python train_resnet_brain_explainable.py [OPTIONS]
+
+Options:
+  --data_dir TEXT                Directory with processed data
+  --output_dir TEXT              Output directory for results
+  --resnet_layers INT INT INT INT ResNet architecture [default: 2 2 2 2]
+  --block_type [basic|bottleneck] ResNet block type [default: basic]
+  --batch_size INT               Batch size [default: 4]
+  --num_epochs INT               Training epochs [default: 50]
+  --learning_rate FLOAT          Learning rate [default: 0.0001]
+  --device [cuda|cpu]            Training device [default: cuda]
+  --generate_explanations        Generate explanation visualizations
+  --num_explain_samples INT      Number of samples to explain [default: 5]
+  --feature_analysis             Perform regional feature analysis
+  --num_analysis_samples INT     Samples for feature analysis [default: 10]
+  --load_model TEXT              Path to pre-trained model
+  --evaluate                     Evaluate on test set
+```
+
+#### Example: Custom ResNet Architecture
+
+```bash
+# Train deeper ResNet with bottleneck blocks
+python train_resnet_brain_explainable.py \
+    --data_dir ./processed_data \
+    --output_dir ./resnet50_results \
+    --resnet_layers 3 4 6 3 \
+    --block_type bottleneck \
+    --batch_size 2 \
+    --num_epochs 100 \
+    --learning_rate 0.0001 \
+    --generate_explanations \
+    --num_explain_samples 15 \
+    --feature_analysis \
+    --num_analysis_samples 25
+```
+
+### Using Pre-trained Models
+
+```bash
+# Generate explanations from existing model (Labeled "future" because I did some future proofing in 2025...we will see how long that lasts)
+python train_resnet_brain_explainable_future.py \
+    --data_dir ./processed_data \
+    --load_model ./results/best_resnet10_brain_mapper.pth \
+    --generate_explanations \
+    --num_explain_samples 20 \
+    --feature_analysis \
+    --evaluate
+```
+
+##  Explainability Features (run Post-hoc)
+
+### GradCAM
+Shows **where** the model focuses attention:
+- Overlays activation maps on original brain images
+- Highlights important anatomical regions
+- Available for both axial and sagittal views
+
+### Integrated Gradients
+Provides **voxel-level attributions**:
+- Shows contribution of each brain voxel to the prediction
+- More precise than GradCAM
+- Useful for fine-grained analysis
+
+### Saliency Maps
+Reveals **gradient-based importance**:
+- Fast computation of feature importance
+- Good for initial exploration
+- Shows direct gradient magnitudes
+
+### Regional Analysis
+Quantifies **anatomical region importance**:
+- Breaks brain into anatomical regions (anterior/posterior, left/right, etc.)
+- Compares importance across brain areas
+- Generates quantitative importance scores
+
+## 📊 Results Interpretation
+
+### Output Structure
+
+```
+results/
+├── best_resnet10_brain_mapper.pth    # Best trained model
+├── resnet10_explainable_training_history.png  # Training curves
+├── explanations/                      # Individual sample explanations
+│   ├── explanation_1_subject001.png
+│   ├── explanation_2_subject002.png
+│   └── ...
+└── feature_analysis/                  # Population-level analysis
+    ├── avg_attribution_case.png      # Average attention for cases
+    ├── avg_attribution_control.png   # Average attention for controls
+    ├── regional_importance.png       # Region importance bar chart
+    └── regional_importance.csv       # Quantitative region data
+```
+
+### Understanding Explanation Visualizations
+
+1. **Original Images**: Raw brain scans (axial and sagittal views)
+2. **GradCAM Overlays**: Red/yellow regions show high attention
+3. **Integrated Gradients**: Hot colormap shows attribution intensity
+4. **Saliency Maps**: Bright regions indicate high gradient magnitudes
+5. **Metadata**: Shows prediction confidence and correctness
+
+### Interpreting Regional Analysis
+
+- **High importance regions**: Areas consistently used for classification
+- **Class differences**: Regions where cases and controls differ
+- **Validation**: Cross-reference with known neuroanatomy
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+#### Memory Errors
+```bash
+# Reduce batch size and/or image resolution
+python train_resnet_brain_explainable.py --batch_size 2 --target_size 96 96 96
+```
+
+#### CUDA Out of Memory
+```bash
+# Use CPU or smaller model
+python train_resnet_brain_explainable.py --device cpu --resnet_layers 1 1 1 1
+```
+
+#### Poor Model Performance
+```bash
+# Try different architectures or longer training
+python train_resnet_brain_explainable.py --resnet_layers 3 4 6 3 --num_epochs 100
+```
+
+#### Missing Dependencies
+```bash
+# Reinstall with specific versions
+pip install monai[all]==1.3.0 torch==2.0.0 torchvision==0.15.0
+```
+
+### Performance Optimization
+
+#### Data Loading
+- Use `num_workers > 0` for faster data loading (if not causing issues)
+- Consider `pin_memory=True` for GPU training
+- Cache preprocessed data for repeated experiments
+
+#### Model Training
+- Use mixed precision training: `torch.cuda.amp.autocast()`
+- Gradient accumulation for larger effective batch sizes
+- Learning rate scheduling and warmup
+
+#### Explainability
+- Generate explanations on a subset of data first
+- Use lower resolution for initial exploration
+- Parallel processing for multiple samples
+
+## 📈 Advanced Usage
+
+### Custom Data Loaders
+
+```python
+from brain_dataset import BrainDataset
+
+# Custom dataset with additional augmentations
+dataset = BrainDataset(
+    data_list, 
+    target_size=(128, 128, 128),
+    augment=True,
+    custom_transforms=my_transforms
+)
+```
+
+### Model Customization
+
+```python
+from train_resnet_brain_explainable import ExplainableResNetBrainTrainer
+
+# Custom trainer with modified architecture
+trainer = ExplainableResNetBrainTrainer(
+    data_dir="./processed_data",
+    resnet_layers=[3, 4, 23, 3],  # ResNet-101 style
+    device="cuda"
+)
+```
+
+### Batch Processing
+
+```bash
+# Process multiple datasets
+for dataset in /data/studies/*/; do
+    python preprocess_brain_data.py --input_dir "$dataset" --output_dir "./processed_$(basename $dataset)"
+done
+```
+
+## 🎯 Best Practices
+
+### Data Preprocessing
+- **Quality Control**: Visually inspect preprocessed data
+- **Consistent Parameters**: Use same preprocessing for train/test
+- **Sufficient Resolution**: Balance memory usage vs. information retention
+
+### Model Training
+- **Cross-Validation**: Use multiple train/validation splits
+- **Early Stopping**: Prevent overfitting with patience parameter
+- **Learning Rate**: Start with 1e-4, adjust based on convergence
+
+### Explainability
+- **Multiple Methods**: Compare GradCAM, IG, and saliency results
+- **Statistical Significance**: Test explanations across multiple subjects
+- **Clinical Validation**: Correlate findings with known anatomy
+
+## 🔬 Research Applications
+
+### Neuroimaging Studies
+- **Disease Classification**: AD, schizophrenia, depression
+- **Biomarker Discovery**: Identify discriminative brain regions
+- **Longitudinal Analysis**: Track brain changes over time
+
+### Clinical Decision Support
+- **Diagnostic Aid**: Support radiologist interpretation
+- **Treatment Planning**: Identify relevant brain areas
+- **Patient Stratification**: Group patients by brain patterns
+
+## 📚 Citation
+
+If you use this pipeline in your research, please cite:
+
+```bibtex
+@software{monai_brain_pipeline,
+    title={MONAI Brain Classification Pipeline with Explainable AI},
+    author={Your Name},
+    year={2024},
+    url={https://github.com/yourusername/monai-brain-pipeline}
+}
+```
+
+## 🤝 Contributing
+
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+### Development Setup
+
+```bash
+# Install development dependencies
+pip install -e ".[dev]"
+pip install black isort flake8 pytest
+
+# Run tests
+pytest tests/
+
+# Format code
+black *.py
+isort *.py
+```
+
+## 📄 License
+
+This project is licensed under the MIT License - see [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- **MONAI Team**: For the excellent medical imaging framework
+- **PyTorch Team**: For the deep learning foundation
+- **Medical Imaging Community**: For inspiration and validation
+
+## Support
+
+- **Issues**: [GitHub Issues](https://github.com/yourusername/monai-brain-pipeline/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/yourusername/monai-brain-pipeline/discussions)
+- **Email**: ashatoum@wustl.edu
+
+---
+
+**Happy Brain Imaging! 🧠✨**
