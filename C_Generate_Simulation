@@ -1,0 +1,348 @@
+"""
+Brain Data Simulator for MONAI Pipeline
+======================================
+
+This script generates simulated brain imaging data with known effect loci
+for psychological phenotype studies.
+
+Usage:
+    python simulate_brain_data.py --n_subjects 50 --output_dir ./data
+    
+Author: Assistant
+"""
+
+import numpy as np
+import nibabel as nib
+from pathlib import Path
+import argparse
+import json
+import pandas as pd
+from scipy import ndimage
+import matplotlib.pyplot as plt
+
+class BrainDataSimulator:
+    """
+    Simulates brain imaging data with known effect loci for psychological phenotypes
+    """
+    
+    def __init__(self, brain_shape=(128, 128, 128), n_subjects=50, random_seed=42):
+        self.brain_shape = brain_shape
+        self.n_subjects = n_subjects
+        self.effect_locations = []
+        np.random.seed(random_seed)
+        
+    def create_base_brain(self):
+        """Create a realistic brain-like structure"""
+        # Create basic brain shape (ellipsoid with some structure)
+        x, y, z = np.mgrid[0:self.brain_shape[0], 0:self.brain_shape[1], 0:self.brain_shape[2]]
+        cx, cy, cz = [s//2 for s in self.brain_shape]
+        
+        # Create ellipsoid brain mask
+        brain_mask = ((x-cx)/60)**2 + ((y-cy)/50)**2 + ((z-cz)/45)**2 < 1
+        
+        # Add some internal structure (gray matter, white matter simulation)
+        brain = np.zeros(self.brain_shape)
+        brain[brain_mask] = 0.5  # Background brain tissue
+        
+        # Add some heterogeneity (simulate different brain regions)
+        for _ in range(10):
+            center = [np.random.randint(20, s-20) for s in self.brain_shape]
+            radius = np.random.randint(8, 15)
+            sphere_mask = ((x-center[0])**2 + (y-center[1])**2 + (z-center[2])**2) < radius**2
+            brain[sphere_mask & brain_mask] += np.random.uniform(0.1, 0.3)
+        
+        # Add realistic noise
+        brain += np.random.normal(0, 0.05, self.brain_shape)
+        brain = np.clip(brain, 0, 1)
+        
+        return brain, brain_mask
+    
+    def add_effect_locus(self, brain, brain_mask, effect_strength=0.3, locus_size=15, location=None):
+        """Add a specific effect locus for cases vs controls"""
+        
+        if location is None:
+            # Default effect location (e.g., simulated amygdala region)
+            effect_center = [64, 45, 60]
+        else:
+            effect_center = location
+            
+        x, y, z = np.mgrid[0:self.brain_shape[0], 0:self.brain_shape[1], 0:self.brain_shape[2]]
+        
+        # Create spherical effect region
+        effect_mask = ((x-effect_center[0])**2 + 
+                      (y-effect_center[1])**2 + 
+                      (z-effect_center[2])**2) < locus_size**2
+        
+        effect_mask = effect_mask & brain_mask
+        
+        # Store effect location for later verification
+        effect_info = {
+            'center': effect_center,
+            'size': locus_size,
+            'mask_coordinates': [coord.tolist() for coord in np.where(effect_mask)],
+            'volume_voxels': int(np.sum(effect_mask)),
+            'effect_strength': float(effect_strength)
+        }
+        
+        # Apply effect
+        brain_with_effect = brain.copy()
+        brain_with_effect[effect_mask] += effect_strength
+        
+        return brain_with_effect, effect_mask, effect_info
+    
+    def add_multiple_effects(self, brain, brain_mask, n_effects=2):
+        """Add multiple effect loci (for more complex phenotypes)"""
+        
+        effect_locations = [
+            [64, 45, 60],   # Amygdala-like
+            [85, 65, 70],   # Prefrontal-like
+            [45, 55, 50]    # Hippocampus-like
+        ]
+        
+        effects_info = []
+        brain_with_effects = brain.copy()
+        combined_mask = np.zeros_like(brain, dtype=bool)
+        
+        for i in range(min(n_effects, len(effect_locations))):
+            effect_strength = np.random.uniform(0.15, 0.35)
+            locus_size = np.random.randint(8, 18)
+            
+            _, effect_mask, effect_info = self.add_effect_locus(
+                brain_with_effects, brain_mask,
+                effect_strength=effect_strength,
+                locus_size=locus_size,
+                location=effect_locations[i]
+            )
+            
+            brain_with_effects[effect_mask] += effect_strength
+            combined_mask = combined_mask | effect_mask
+            effects_info.append(effect_info)
+        
+        return brain_with_effects, combined_mask, effects_info
+    
+    def generate_dataset(self, case_control_ratio=0.5, multiple_effects=False, 
+                        output_dir="./data", save_nifti=True):
+        """Generate complete dataset with cases and controls"""
+        
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Create subdirectories
+        (output_dir / "cases").mkdir(exist_ok=True)
+        (output_dir / "controls").mkdir(exist_ok=True)
+        (output_dir / "masks").mkdir(exist_ok=True)
+        
+        n_cases = int(self.n_subjects * case_control_ratio)
+        n_controls = self.n_subjects - n_cases
+        
+        metadata = []
+        all_effects_info = []
+        
+        print(f"Generating {n_cases} cases and {n_controls} controls...")
+        
+        # Generate cases (with effect)
+        for i in range(n_cases):
+            subject_id = f"case_{i:03d}"
+            
+            brain, brain_mask = self.create_base_brain()
+            
+            if multiple_effects:
+                brain_with_effect, effect_mask, effects_info = self.add_multiple_effects(
+                    brain, brain_mask, n_effects=np.random.randint(1, 4)
+                )
+                all_effects_info.extend(effects_info)
+            else:
+                brain_with_effect, effect_mask, effect_info = self.add_effect_locus(
+                    brain, brain_mask, 
+                    effect_strength=np.random.uniform(0.2, 0.4)
+                )
+                all_effects_info.append(effect_info)
+            
+            # Save data
+            if save_nifti:
+                # Save brain image
+                nii_img = nib.Nifti1Image(brain_with_effect.astype(np.float32), np.eye(4))
+                nib.save(nii_img, output_dir / "cases" / f"{subject_id}.nii.gz")
+                
+                # Save effect mask
+                mask_img = nib.Nifti1Image(effect_mask.astype(np.uint8), np.eye(4))
+                nib.save(mask_img, output_dir / "masks" / f"{subject_id}_mask.nii.gz")
+            
+            # Store metadata
+            metadata.append({
+                'subject_id': subject_id,
+                'group': 'case',
+                'label': 1,
+                'file_path': f"cases/{subject_id}.nii.gz",
+                'mask_path': f"masks/{subject_id}_mask.nii.gz"
+            })
+        
+        # Generate controls (without effect)
+        for i in range(n_controls):
+            subject_id = f"control_{i:03d}"
+            
+            brain, brain_mask = self.create_base_brain()
+            
+            # Save data
+            if save_nifti:
+                # Save brain image
+                nii_img = nib.Nifti1Image(brain.astype(np.float32), np.eye(4))
+                nib.save(nii_img, output_dir / "controls" / f"{subject_id}.nii.gz")
+                
+                # Save empty mask
+                empty_mask = np.zeros_like(brain, dtype=np.uint8)
+                mask_img = nib.Nifti1Image(empty_mask, np.eye(4))
+                nib.save(mask_img, output_dir / "masks" / f"{subject_id}_mask.nii.gz")
+            
+            # Store metadata
+            metadata.append({
+                'subject_id': subject_id,
+                'group': 'control',
+                'label': 0,
+                'file_path': f"controls/{subject_id}.nii.gz",
+                'mask_path': f"masks/{subject_id}_mask.nii.gz"
+            })
+        
+        # Save metadata as CSV
+        df_metadata = pd.DataFrame(metadata)
+        df_metadata.to_csv(output_dir / "subjects_metadata.csv", index=False)
+        
+        # Save effect information as JSON
+        with open(output_dir / "ground_truth_effects.json", 'w') as f:
+            # Convert numpy arrays to lists for JSON serialization
+            effects_for_json = []
+            for effect in all_effects_info:
+                effect_json = {
+                    'center': effect['center'],
+                    'size': effect['size'],
+                    'mask_coordinates': effect['mask_coordinates'],  # Already converted to list
+                    'volume_voxels': effect['volume_voxels'],
+                    'effect_strength': effect['effect_strength']
+                }
+                effects_for_json.append(effect_json)
+            
+            json.dump({
+                'brain_shape': self.brain_shape,
+                'n_subjects': self.n_subjects,
+                'n_cases': n_cases,
+                'n_controls': n_controls,
+                'effects_info': effects_for_json,
+                'multiple_effects': multiple_effects
+            }, f, indent=2)
+        
+        print(f"Dataset saved to: {output_dir}")
+        print(f"  - {n_cases} cases in 'cases/' directory")
+        print(f"  - {n_controls} controls in 'controls/' directory")
+        print(f"  - Effect masks in 'masks/' directory")
+        print(f"  - Metadata in 'subjects_metadata.csv'")
+        print(f"  - Ground truth effects in 'ground_truth_effects.json'")
+        
+        return df_metadata, all_effects_info
+
+def visualize_sample_data(data_dir, n_samples=3):
+    """Visualize sample generated data"""
+    
+    data_dir = Path(data_dir)
+    metadata = pd.read_csv(data_dir / "subjects_metadata.csv")
+    
+    # Get some case and control examples
+    cases = metadata[metadata['group'] == 'case'].head(n_samples)
+    controls = metadata[metadata['group'] == 'control'].head(n_samples)
+    
+    fig, axes = plt.subplots(2, n_samples * 2, figsize=(4 * n_samples, 8))
+    
+    for i, (_, case_row) in enumerate(cases.iterrows()):
+        # Load case brain and mask
+        case_img = nib.load(data_dir / case_row['file_path']).get_fdata()
+        case_mask = nib.load(data_dir / case_row['mask_path']).get_fdata()
+        
+        # Show middle slice
+        mid_slice = case_img.shape[2] // 2
+        
+        # Brain image
+        axes[0, i*2].imshow(case_img[:, :, mid_slice], cmap='gray')
+        axes[0, i*2].set_title(f"Case {i+1} - Brain")
+        axes[0, i*2].axis('off')
+        
+        # Effect mask overlay
+        axes[0, i*2+1].imshow(case_img[:, :, mid_slice], cmap='gray')
+        axes[0, i*2+1].imshow(case_mask[:, :, mid_slice], cmap='Reds', alpha=0.5)
+        axes[0, i*2+1].set_title(f"Case {i+1} - Effect Mask")
+        axes[0, i*2+1].axis('off')
+    
+    for i, (_, control_row) in enumerate(controls.iterrows()):
+        # Load control brain
+        control_img = nib.load(data_dir / control_row['file_path']).get_fdata()
+        
+        # Show middle slice
+        mid_slice = control_img.shape[2] // 2
+        
+        # Brain image
+        axes[1, i*2].imshow(control_img[:, :, mid_slice], cmap='gray')
+        axes[1, i*2].set_title(f"Control {i+1} - Brain")
+        axes[1, i*2].axis('off')
+        
+        # Empty for symmetry
+        axes[1, i*2+1].axis('off')
+        axes[1, i*2+1].set_title(f"Control {i+1} - No Effect")
+    
+    plt.tight_layout()
+    plt.savefig(data_dir / "sample_data_visualization.png", dpi=150, bbox_inches='tight')
+    plt.show()
+    
+    print(f"Sample visualization saved to: {data_dir / 'sample_data_visualization.png'}")
+
+def main():
+    parser = argparse.ArgumentParser(description="Generate simulated brain data for MONAI pipeline")
+    
+    parser.add_argument('--n_subjects', type=int, default=50, 
+                       help='Total number of subjects to generate')
+    parser.add_argument('--brain_shape', nargs=3, type=int, default=[128, 128, 128],
+                       help='Shape of brain volumes (x, y, z)')
+    parser.add_argument('--case_ratio', type=float, default=0.5,
+                       help='Ratio of cases to total subjects')
+    parser.add_argument('--output_dir', type=str, default='./brain_data',
+                       help='Output directory for generated data')
+    parser.add_argument('--multiple_effects', action='store_true',
+                       help='Generate multiple effect loci per case')
+    parser.add_argument('--visualize', action='store_true',
+                       help='Generate visualization of sample data')
+    parser.add_argument('--random_seed', type=int, default=42,
+                       help='Random seed for reproducibility')
+    
+    args = parser.parse_args()
+    
+    print("=== Brain Data Simulator ===")
+    print(f"Generating {args.n_subjects} subjects...")
+    print(f"Brain shape: {args.brain_shape}")
+    print(f"Output directory: {args.output_dir}")
+    print(f"Multiple effects: {args.multiple_effects}")
+    
+    # Initialize simulator
+    simulator = BrainDataSimulator(
+        brain_shape=tuple(args.brain_shape),
+        n_subjects=args.n_subjects,
+        random_seed=args.random_seed
+    )
+    
+    # Generate dataset
+    metadata, effects_info = simulator.generate_dataset(
+        case_control_ratio=args.case_ratio,
+        multiple_effects=args.multiple_effects,
+        output_dir=args.output_dir
+    )
+    
+    print(f"\nGeneration completed!")
+    print(f"Cases: {len(metadata[metadata['group'] == 'case'])}")
+    print(f"Controls: {len(metadata[metadata['group'] == 'control'])}")
+    print(f"Total effects generated: {len(effects_info)}")
+    
+    # Generate visualization if requested
+    if args.visualize:
+        print("\nGenerating sample visualization...")
+        visualize_sample_data(args.output_dir)
+    
+    print("\nNext step: Run 'python process_brain_data.py' to prepare data for training")
+
+if __name__ == "__main__":
+    main()
