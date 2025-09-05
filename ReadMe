@@ -282,6 +282,18 @@ results/
 - **Class differences**: Regions where cases and controls differ
 - **Validation**: Cross-reference with known neuroanatomy
 
+### I have also created a Densent script that works in the same frameowkr. It doesn't work quite as well as my ResNet script in practice.
+###The densenet script doesn't have explainable components and it takes longer to run, so generally less preferred from my perspective. Still, worth testing and it works with the
+###Same data as the rest of the pipeline
+
+# DenseNet121 (most common) 
+python train_densenet_brain.py --data_dir ./my_processed_data --evaluate
+
+# DenseNet169 (deeper levels, options are 121, 169, 201)
+python train_densenet_brain.py --data_dir ./my_processed_data --densenet_version 169 --evaluate
+
+
+
 ## 🐛 Troubleshooting
 
 ### Common Issues
