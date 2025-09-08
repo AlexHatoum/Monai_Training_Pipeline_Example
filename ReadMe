@@ -24,7 +24,7 @@ This pipeline enables:
 - [Troubleshooting](#troubleshooting)
 - [Citation](#citation)
 
-## 🚀 Installation
+##  Installation
 
 ### Prerequisites
 - Python 3.8+
@@ -55,7 +55,7 @@ pip install scipy nibabel pydicom
 python -c "import monai; print(f'MONAI version: {monai.__version__}')"
 ```
 
-## 📁 Data Structure
+##  Data Structure
 
 Organize your data in the following structure:
 
@@ -81,7 +81,7 @@ your_data_directory/
 - **DICOM**: Series of `.dcm` files
 - **Analyze**: `.hdr`/`.img` pairs
 
-## 🔄 Pipeline Overview
+##  Pipeline Overview
 
 ```mermaid
 graph LR
@@ -93,7 +93,7 @@ graph LR
     F --> G[Results & Visualizations]
 ```
 
-## ⚡ Quick Start
+## Quick Start
 
 ### 1. Preprocess Data
 
@@ -297,7 +297,7 @@ python train_densenet_brain.py --data_dir ./my_processed_data --densenet_version
 
 
 
-## 🐛 Troubleshooting
+##  Troubleshooting
 
 ### Common Issues
 
@@ -409,7 +409,7 @@ done
 - **Treatment Planning**: Identify relevant brain areas
 - **Patient Stratification**: Group patients by brain patterns
 
-## 📚 Citation
+##  Citation
 
 If you use this pipeline in your research, please cite:
 
@@ -418,13 +418,13 @@ If you use this pipeline in your research, please cite:
     title={MONAI Brain Classification Pipeline with Explainable AI},
     author={Your Name},
     year={2024},
-    url={https://github.com/yourusername/monai-brain-pipeline}
+    url={https://github.com/AlexHatoum/monai-brain-pipeline}
 }
 ```
 
-## 🤝 Contributing
+##  Contributing
 
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines. I'm also open to contributing this analysis to the MONAI project when I am done. 
 
 ### Development Setup
 
@@ -441,11 +441,11 @@ black *.py
 isort *.py
 ```
 
-## 📄 License
+##  License
 
-This project is licensed under the MIT License - see [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see [LICENSE](LICENSE) file for details. #I will get to this. 
 
-## 🙏 Acknowledgments
+##  Acknowledgments
 
 - **MONAI Team**: For the excellent medical imaging framework
 - **PyTorch Team**: For the deep learning foundation
